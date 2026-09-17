@@ -25,6 +25,7 @@ import android.widget.DatePicker;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.medicmobile.webapp.mobile.p2p.P2pManager;
 import org.medicmobile.webapp.mobile.util.AppDataStore;
 
 import java.io.BufferedReader;
@@ -52,6 +53,7 @@ public class MedicAndroidJavascript {
 	private final MrdtSupport mrdt;
 	private final SmsSender smsSender;
 	private final ChtExternalAppHandler chtExternalAppHandler;
+	private final P2pManager p2pManager;
 
 	private ActivityManager activityManager;
 	private ConnectivityManager connectivityManager;
@@ -62,6 +64,7 @@ public class MedicAndroidJavascript {
 		this.mrdt = parent.getMrdtSupport();
 		this.smsSender = parent.getSmsSender();
 		this.chtExternalAppHandler = parent.getChtExternalAppHandler();
+		this.p2pManager = parent.getP2pManager();
 	}
 
 	public void setAlert(Alert soundAlert) {
@@ -177,6 +180,63 @@ public class MedicAndroidJavascript {
 	@android.webkit.JavascriptInterface
 	public boolean sms_available() {
 		return smsSender != null;
+	}
+
+	/**
+	 * Whether this device can host a P2P sync session. False below Android 8.0, where the
+	 * local-only hotspot API does not exist. Joining a session has no such limit.
+	 */
+	@android.webkit.JavascriptInterface
+	public boolean p2p_host_available() {
+		return p2pManager != null && P2pManager.isHostSupported();
+	}
+
+	/**
+	 * Brings up the hotspot and the local server, then reports the payload a peer scans.
+	 *
+	 * Asynchronous: the result arrives on the webapp's P2P callback rather than as a return value,
+	 * because the hotspot takes seconds to come up.
+	 */
+	@android.webkit.JavascriptInterface
+	public void p2p_start_hosting() {
+		if(!p2p_host_available()) {
+			respondToP2p(false, "hotspot_unsupported");
+			return;
+		}
+		p2pManager.startHosting(new P2pManager.HostingCallback() {
+			@Override public void onReady(String qrPayload) {
+				respondToP2p(true, qrPayload);
+			}
+
+			@Override public void onFailed(String reason) {
+				respondToP2p(false, reason);
+			}
+		});
+	}
+
+	@android.webkit.JavascriptInterface
+	public void p2p_stop_hosting() {
+		if(p2pManager != null) {
+			p2pManager.stopHosting();
+		}
+	}
+
+	@android.webkit.JavascriptInterface
+	public boolean p2p_is_hosting() {
+		return p2pManager != null && p2pManager.isHosting();
+	}
+
+	private void respondToP2p(boolean ok, String detail) {
+		parent.evaluateJavascript(String.format(
+				"try {" +
+						"const api = window.CHTCore.AndroidApi;" +
+						"if (api && api.v1 && api.v1.resolveP2pHostingResult) {" +
+						"  api.v1.resolveP2pHostingResult(%s, %s);" +
+						"}" +
+						"} catch (error) {" +
+						"  console.error('MedicAndroidJavascript :: P2P result not delivered', error);" +
+						"}",
+				ok, JSONObject.quote(detail)));
 	}
 
 	/**

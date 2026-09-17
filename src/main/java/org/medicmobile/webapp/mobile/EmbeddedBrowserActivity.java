@@ -41,6 +41,8 @@ import androidx.core.view.ViewCompat;
 import java.util.Arrays;
 import java.util.Optional;
 
+import org.medicmobile.webapp.mobile.p2p.P2pManager;
+
 @SuppressWarnings({ "PMD.GodClass", "PMD.TooManyMethods" })
 public class EmbeddedBrowserActivity extends Activity {
 
@@ -50,6 +52,7 @@ public class EmbeddedBrowserActivity extends Activity {
 	private MrdtSupport mrdt;
 	private FilePickerHandler filePickerHandler;
 	private SmsSender smsSender;
+	private P2pManager p2pManager;
 	private ChtExternalAppHandler chtExternalAppHandler;
 	private boolean isMigrationRunning = false;
 
@@ -80,6 +83,15 @@ public class EmbeddedBrowserActivity extends Activity {
 			this.smsSender = SmsSender.createInstance(this);
 		} catch(Exception ex) {
 			error(ex, "Failed to create SmsSender.");
+		}
+
+		// Only devices that can host get a manager at all; the webapp asks before offering the option.
+		if(P2pManager.isHostSupported()) {
+			try {
+				this.p2pManager = P2pManager.create(this, Build.MODEL);
+			} catch(Exception ex) {
+				error(ex, "Failed to create P2pManager.");
+			}
 		}
 
 		this.settings = SettingsStore.in(this);
@@ -266,6 +278,10 @@ public class EmbeddedBrowserActivity extends Activity {
 
 	SmsSender getSmsSender() {
 		return this.smsSender;
+	}
+
+	P2pManager getP2pManager() {
+		return this.p2pManager;
 	}
 
 	ChtExternalAppHandler getChtExternalAppHandler() {
