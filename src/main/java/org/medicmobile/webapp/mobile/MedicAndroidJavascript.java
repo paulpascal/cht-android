@@ -235,10 +235,6 @@ public class MedicAndroidJavascript {
 				OfflineSyncForegroundService.stop(parent);
 				respondToOfflineSync(false, reason, "");
 			}
-
-			@Override public void onLost(String reason) {
-				respondToP2p(false, reason);
-			}
 		});
 	}
 
